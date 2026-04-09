@@ -712,14 +712,19 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
             }
             if (request.method === 'POST') {
                 try {
-                    const newSettings = await request.json();
+                    const newSettings = (await request.json()) as any;
                     const storage = await getStorage(env);
                     const oldSettings =
                         (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || {};
+
+                    // 检查是否为静默模式（内部数据同步，不发送通知）
+                    const isSilent = newSettings._silent === true;
+                    delete newSettings._silent; // 移除内部标记
+
                     // 使用白名单机制清洗数据：只保留 defaultSettings 中存在的字段
                     // 这样即使未来删除了某个配置项，保存时也会自动剔除旧数据
                     const finalSettings: any = {};
-                    const anyNewSettings = newSettings as any;
+                    const anyNewSettings = newSettings;
 
                     for (const key of Object.keys(defaultSettings)) {
                         const k = key as string;
@@ -735,8 +740,11 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
 
                     await storage.put(KV_KEY_SETTINGS, finalSettings);
 
-                    const message = `⚙️ *Sub-One 设置更新* ⚙️\n\n您的 Sub-One 应用设置已成功更新。`;
-                    await sendTgNotification(finalSettings, message);
+                    // 只在非静默模式下发送 TG 通知（用户从设置模态框主动保存）
+                    if (!isSilent) {
+                        const message = `⚙️ *Sub-One 设置更新* ⚙️\n\n您的 Sub-One 应用设置已成功更新。`;
+                        await sendTgNotification(finalSettings, message);
+                    }
 
                     return new Response(JSON.stringify({ success: true, message: '设置已保存' }));
                 } catch (e) {
@@ -1227,6 +1235,46 @@ export async function handleApiRequest(request: Request, env: Env): Promise<Resp
                     JSON.stringify({
                         success: false,
                         error: '恢复快照失败',
+                        message: error.message
+                    }),
+                    { status: 500 }
+                );
+            }
+        }
+        case '/notify': {
+            // POST: 发送 TG 通知（用于前端订阅管理）
+            if (request.method !== 'POST')
+                return new Response('Method Not Allowed', { status: 405 });
+            try {
+                const { message } = (await request.json()) as { message: string };
+                if (!message || typeof message !== 'string') {
+                    return new Response(
+                        JSON.stringify({ success: false, error: '缺少通知消息' }),
+                        { status: 400 }
+                    );
+                }
+
+                const storage = await getStorage(env);
+                const settings =
+                    (await storage.get<Partial<AppConfig>>(KV_KEY_SETTINGS)) || {};
+                const finalSettings = { ...defaultSettings, ...settings } as AppConfig;
+
+                // 发送 TG 通知
+                const sent = await sendTgNotification(finalSettings, message);
+
+                return new Response(
+                    JSON.stringify({
+                        success: sent,
+                        message: sent ? '通知已发送' : '通知发送失败或未配置 TG'
+                    }),
+                    { headers: { 'Content-Type': 'application/json' } }
+                );
+            } catch (error: any) {
+                console.error('[API Error /notify]', error);
+                return new Response(
+                    JSON.stringify({
+                        success: false,
+                        error: '发送通知失败',
                         message: error.message
                     }),
                     { status: 500 }

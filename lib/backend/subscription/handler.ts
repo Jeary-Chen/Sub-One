@@ -2,7 +2,6 @@ import { KV_KEY_PROFILES, KV_KEY_SETTINGS, KV_KEY_SUBS } from '../config/constan
 import { GLOBAL_USER_AGENT, defaultSettings } from '../config/defaults';
 import { ProxyNode, convert, parse, process } from '../proxy';
 import { AppConfig, Profile, SubConfig, Subscription } from '../proxy/types';
-import { sendTgNotification } from '../services/notification';
 import { StorageFactory } from '../services/storage';
 import { getStorageBackendInfo } from '../services/storage-backend';
 import { Env } from '../types';
@@ -330,28 +329,7 @@ export async function handleSubRequest(
         targetFormat = 'base64';
     }
 
-    if (!url.searchParams.has('callback_token')) {
-        const clientIp = request.headers.get('CF-Connecting-IP') || 'N/A';
-        const country = request.headers.get('CF-IPCountry') || 'N/A';
-        const domain = url.hostname;
-        let message = `🛰️ *订阅被访问* 🛰️\n\n*域名:* \`${domain}\`\n*客户端:* \`${userAgentHeader}\`\n*IP 地址:* \`${clientIp} (${country})\`\n*请求格式:* \`${targetFormat}\``;
-
-        if (profileIdentifier) {
-            message += `\n*订阅组:* \`${subName}\``;
-            const profile = allProfiles.find(
-                (p) =>
-                    (p.customId && p.customId === profileIdentifier) || p.id === profileIdentifier
-            );
-            if (profile && profile.expiresAt) {
-                const expiryDateStr = new Date(profile.expiresAt).toLocaleString('zh-CN', {
-                    timeZone: 'Asia/Shanghai'
-                });
-                message += `\n*到期时间:* \`${expiryDateStr}\``;
-            }
-        }
-
-        context.waitUntil(sendTgNotification(config as AppConfig, message));
-    }
+    // 注意：订阅被访问通知已移除，避免过于频繁的 TG 消息
 
     // 计算订阅组的流量统计信息（用于 HTTP 头部）
     let totalUpload = 0;

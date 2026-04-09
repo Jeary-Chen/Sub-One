@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import type { Subscription } from '@/common/types/index';
 import { HTTP_REGEX } from '@/common/utils/constants';
 import { createSubscription } from '@/common/utils/importer';
+import { sendNotification } from '@/common/utils/api';
 
 import { useDataStore } from '@/stores/useAppStore';
 import { useToastStore } from '@/stores/useNotificationStore';
@@ -79,6 +80,11 @@ export function useSubscriptionManagement() {
         if (success) {
             if (!silent) toastStore.showToast(`✅ ${sub.name || '订阅'} 已更新`, 'success');
             await dataStore.saveData('订阅节点更新', false);
+
+            // 发送 TG 通知（单个订阅更新）
+            const nodeCount = sub.nodeCount || 0;
+            const message = `🔄 *订阅更新完成*\n\n*订阅名称:* \`${sub.name || '未命名'}\`\n*节点数量:* \`${nodeCount}\` 个节点`;
+            await sendNotification(message);
         } else {
             toastStore.showToast(`❌ 更新失败: ${sub.errorMsg || '未知错误'}`, 'error');
         }
@@ -92,6 +98,10 @@ export function useSubscriptionManagement() {
             if (result.success) {
                 toastStore.showToast(`✅ 成功更新了 ${result.count} 个订阅`, 'success');
                 await dataStore.saveData('批量更新', false);
+
+                // 发送 TG 通知（批量更新汇总）
+                const message = `🔄 *批量更新完成*\n\n✅ 成功更新了 \`${result.count}\` 个订阅`;
+                await sendNotification(message);
             } else {
                 toastStore.showToast(`❌ 更新失败: ${result.message}`, 'error');
             }

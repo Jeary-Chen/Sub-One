@@ -728,8 +728,8 @@ watch(
                                             />
                                             <button
                                                 type="button"
-                                                @click="copyCronUrl"
                                                 class="rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 transition-colors"
+                                                @click="copyCronUrl"
                                             >
                                                 复制链接
                                             </button>

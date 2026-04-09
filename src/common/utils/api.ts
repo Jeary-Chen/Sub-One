@@ -223,14 +223,11 @@ export async function saveAllData(data: {
     config: AppConfig;
 }): Promise<ApiResponse> {
     try {
-        // 并行保存配置和订阅
-        const [subsResult, settingsResult] = await Promise.all([
-            saveSubs(data.subs, data.profiles),
-            saveSettings(data.config)
-        ]);
+        // 只保存订阅和订阅组数据，不保存配置
+        // 配置通过 saveSettings 单独保存，避免频繁触发 TG 通知
+        const subsResult = await saveSubs(data.subs, data.profiles);
 
         if (!subsResult.success) return subsResult;
-        if (!settingsResult.success) return settingsResult;
 
         return { success: true, message: '数据保存成功' };
     } catch (e: unknown) {
@@ -631,6 +628,44 @@ export async function restoreSnapshot(
         return await response.json();
     } catch (error) {
         console.error('恢复快照失败:', error);
+        return { success: false, message: '网络请求失败' };
+    }
+}
+
+// ==================== TG 通知 ====================
+
+/**
+ * 发送 TG 通知
+ *
+ * 说明：
+ * - 用于前端订阅管理完成后发送通知
+ * - 支持单个订阅更新和批量更新通知
+ *
+ * @param {string} message - 通知消息内容
+ * @returns {Promise<ApiResponse>} 返回发送结果
+ */
+export async function sendNotification(message: string): Promise<ApiResponse> {
+    try {
+        const response = await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+
+        if (!response.ok) {
+            const errorData = (await response.json().catch(() => ({}))) as {
+                message?: string;
+                error?: string;
+            };
+            return {
+                success: false,
+                message: errorData.message || errorData.error || `服务器错误 (${response.status})`
+            };
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('发送通知失败:', error);
         return { success: false, message: '网络请求失败' };
     }
 }
