@@ -138,6 +138,10 @@ export class ClashConverter extends BaseConverter {
                     if (node.aead) node.alterId = 0;
                     delete node.aead;
                 }
+                // 确保 alterId 有默认值（现代 VMess 通常使用 AEAD，alterId 为 0）
+                if (!isPresent(node, 'alterId')) {
+                    node.alterId = 0;
+                }
                 const vmessCiphers = ['auto', 'aes-128-gcm', 'chacha20-poly1305', 'none', 'zero'];
                 if (node.cipher && !vmessCiphers.includes(node.cipher)) {
                     node.cipher = 'auto';
